@@ -11,6 +11,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from statlearning import plot_dist, plot_dists, plot_regressions
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import warnings
 
 warnings.simplefilter("ignore")
@@ -59,7 +60,7 @@ def fill_cvs(copy_name, copy_type):
 
 train_copy = fill_cvs(train_copy, 'train')
 test_copy = fill_cvs(test_copy, 'test')
-print(test_copy['latitude'])
+# print(test_copy['latitude'])
 # print(train_copy.isna().sum())
 # print('----------------')
 # print(test_copy.isna().sum())
@@ -166,49 +167,54 @@ train_des.loc['skew', :] = train_copy_for_dm.skew()
 train_des.loc['kurt', :] = train_copy_for_dm.kurt()
 train_des[other_list].round(3)
 
+
 # ------------画图---------------#
-# log_y_train = np.log(train_copy_for_dm['price'])
-# plot_dist(log_y_train)
-# plt.title('tmp')
-# plt.show()
-#
-# plot_dists(train_copy_for_dm[other_list])
-# plt.show()
-# reg_other = copy.deepcopy(other_list)
-# reg_other.remove('price')
-# plot_regressions(train_copy_for_dm[reg_other], train_copy_for_dm['price'])
-# plt.show()
-#
-# sns.boxplot(x=train_copy_for_dm.loc[:, 'bed_type_Real Bed'], y=train_copy_for_dm.loc[:, 'price'], palette='Blues')
-# sns.despine()
-# plt.show()
-#
-# # 对 'host_identity_verified', 'host_response_time','cancellation_policy' 做同样的图
-#
-# rows = train_copy_for_dm['accommodates'] <= 12
-# sns.boxplot(x=train_copy_for_dm.loc[rows, 'accommodates'], y=train_copy_for_dm.loc[rows, 'price'], palette='Blues')
-# sns.despine()
-# plt.show()
-#
-# corr_map = train_copy_for_dm.corr()['price'].sort_values()
-# print(corr_map)
-# COR_THRESHOLD = 0.08
-# train_cor = train_copy_for_dm[corr_map.loc[(corr_map > COR_THRESHOLD) | (corr_map < -COR_THRESHOLD)].index]
-# plt.subplots(figsize=(20, 15))
-# sns.heatmap(train_cor.corr(), square=True, annot=True, cmap="Accent")
-# plt.title("heap map")
-# plt.show()
-#
-# # 删除异常值，自己看前面的图，删一些离谱的数据
-# train_copy_for_dm = train_copy_for_dm[-((train_copy_for_dm['extra_people'] > 100) |
-#                                         (train_copy_for_dm['security_deposit'] > 2000))]
-# print(train_copy_for_dm.shape)
+def draw(train_model):
+    log_y_train = np.log(train_model['price'])
+    plot_dist(log_y_train)
+    plt.title('tmp')
+    plt.show()
+
+    plot_dists(train_model[other_list])
+    plt.show()
+    reg_other = copy.deepcopy(other_list)
+    reg_other.remove('price')
+    plot_regressions(train_model[reg_other], train_model['price'])
+    plt.show()
+
+    sns.boxplot(x=train_model.loc[:, 'bed_type_Real Bed'], y=train_model.loc[:, 'price'], palette='Blues')
+    sns.despine()
+    plt.show()
+
+    # 对 'host_identity_verified', 'host_response_time','cancellation_policy' 做同样的图
+
+    rows = train_model['accommodates'] <= 12
+    sns.boxplot(x=train_copy_for_dm.loc[rows, 'accommodates'], y=train_model.loc[rows, 'price'], palette='Blues')
+    sns.despine()
+    plt.show()
+
+    corr_map = train_model.corr()['price'].sort_values()
+    # print(corr_map)
+    COR_THRESHOLD = 0.08
+    train_cor = train_model[corr_map.loc[(corr_map > COR_THRESHOLD) | (corr_map < -COR_THRESHOLD)].index]
+    plt.subplots(figsize=(20, 15))
+    sns.heatmap(train_cor.corr(), square=True, annot=True, cmap="Accent")
+    plt.title("heap map")
+    plt.show()
+
+
+# draw(train_copy_for_dm)
+
+
+# -----------------------------------------------------------------#
+
+# 删除异常值，自己看前面的图，删一些离谱的数据
+train_copy_for_dm = train_copy_for_dm[-((train_copy_for_dm['extra_people'] > 100) |
+                                        (train_copy_for_dm['security_deposit'] > 2000))]
+print(train_copy_for_dm.shape)
 
 # -------------------------#
 
-x_train = train_copy_for_dm.drop(['price', 'Id'], axis=1)
-y_train = train_copy_for_dm['price']
-x_test = test_copy_for_dm.drop(['Id'], axis=1)
 
 log_train = copy.deepcopy(train_copy_for_dm)
 log_test = copy.deepcopy(test_copy_for_dm)
@@ -218,4 +224,30 @@ des.loc['skew', :] = log_train.skew()
 des.loc['kurt', :] = log_train.kurt()
 des = des[other_list].T
 # print(des)
+positive_skewed = des.loc[des['skew'] > 0].index
+for skewed in positive_skewed[1:]:
+    log_train[skewed] = np.log(log_train[skewed] + 1)
+    log_test[skewed] = np.log(log_train[skewed] + 1)
+log_train['price'] = np.log(log_train['price'])
 
+x_train_log = log_train.drop(['price', 'Id'], axis=1)
+y_train_log = log_train['price']
+x_test_log = log_train.drop(['Id'], axis=1)
+
+# -------------------------scaling-------------------------- #
+"""
+选择method1 or method2
+"""
+min_max_scaler = MinMaxScaler()
+standard_scaler = StandardScaler()
+# method1
+x_train_log_mm_sacled = min_max_scaler.fit_transform(x_train_log)
+x_test_log_mm_sacled = min_max_scaler.transform(x_train_log)
+# method2
+x_train_log_standard_sacled = standard_scaler.fit_transform(x_train_log)
+x_test_log_standard_sacled = standard_scaler.transform(x_train_log)
+
+print(x_test_log_mm_sacled)
+# draw(x_test_log_mm_sacled)
+
+# x_something -->完成数据处理后的矩阵，用这个信息和y_train作图，做出来新图重新分析，写在rep里
